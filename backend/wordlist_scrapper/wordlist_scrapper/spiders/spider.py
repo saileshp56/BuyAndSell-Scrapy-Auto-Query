@@ -42,6 +42,7 @@ class WebsiteSpider(CrawlSpider):
         for x in deny_args[2::2]:
               deny_set.add(x[x.find('=')+1:])
         print("Denying the following urls: ", deny_set)
+        print("Start URL is", self.start_urls, "and Allowed Domains", self.allowed_domains)
 
 
         self.rules = [Rule(LinkExtractor(deny=deny_set), follow=True, callback="check_buzzwords")]
@@ -65,7 +66,7 @@ class WebsiteSpider(CrawlSpider):
         crawl_count = self.__class__.crawl_count
 
         wordlist = [
-            "buy",
+            "buyandsell",
             #"Office of Small",
             #"Medium Enterprises",
             #"Office of Small and Medium Enterprises",

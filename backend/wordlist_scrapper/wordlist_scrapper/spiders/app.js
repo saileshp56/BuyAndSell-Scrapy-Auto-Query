@@ -7,12 +7,13 @@ const fs = require("fs");
 const app = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(cors()); // Use this after the variable declaration
+app.use(cors());
 app.use(express.json());
 
 app.post("/scrapy", async (req, res, next) => {
   console.log("Received post request at backend's /scrapy: ", req.body);
 
+  let processError = null;
   let param1;
   let param2;
   let param3;
@@ -71,20 +72,14 @@ app.post("/scrapy", async (req, res, next) => {
   let success = true;
 
   const cmd = exec(
-    //sample param1 domains=buyandsell.gc.ca
-    //sample param2 start=https://buyandsell.gc.ca/for-businesses
     `scrapy crawl keybas -a domains=${param1} -a start=${param2} ${to_add_string}`,
     (error, stdout, stderr) => {
       if (error) {
         console.log(
           "An error occured within scrapy. Gracefully handling and not closing server"
         );
-        error = new Error(`Scrapy raised an error: ${error}`);
-
-        success = false;
-        res.status(error.code || 424);
-        res.json({ message: error.message || "An unknown error occurred!" });
-        return;
+        processError = new Error(`Scrapy raised an error: ${error}`);
+        cmd.kill(); // Kill the process immediately on error
       }
     }
   );
@@ -95,24 +90,26 @@ app.post("/scrapy", async (req, res, next) => {
       console.log(
         `Scrapy crawl's time is up. Scrapy crawl process has been killed`
       );
-      if (!success) {
+      
+      if (processError) {
+        res.status(processError.code || 424);
+        res.json({ message: processError.message || "An unknown error occurred!" });
         return;
       }
+
       const filePath = "./scrapy_output.csv";
       try {
         fs.exists(filePath, function (exists) {
-          //https://stackoverflow.com/questions/10046039/node-js-send-file-in-response
           if (exists) {
             res.writeHead(200, {
               "Content-Type": "application/octet-stream",
-              "Content-Disposition":
-                "attachment; filename=" + "scrapy_output.csv",
+              "Content-Disposition": "attachment; filename=" + "scrapy_output.csv",
             });
             fs.createReadStream(filePath).pipe(res);
-            return;
+          } else {
+            res.writeHead(400, { "Content-Type": "text/plain" });
+            res.end("ERROR File does not exist");
           }
-          res.writeHead(400, { "Content-Type": "text/plain" });
-          res.end("ERROR File does not exist");
         });
       } catch (err) {}
     },
